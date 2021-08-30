@@ -53,6 +53,9 @@ public class FlowRuleManager {
      */
     private static volatile Map<String, List<FlowRule>> flowRules = new HashMap<>();
 
+    /**
+     * 回调的Listener实现
+     */
     private static final FlowPropertyListener LISTENER = new FlowPropertyListener();
     private static SentinelProperty<List<FlowRule>> currentProperty = new DynamicSentinelProperty<List<FlowRule>>();
 
