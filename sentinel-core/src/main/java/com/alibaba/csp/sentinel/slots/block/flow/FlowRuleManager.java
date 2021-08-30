@@ -48,6 +48,9 @@ import com.alibaba.csp.sentinel.property.SentinelProperty;
  */
 public class FlowRuleManager {
 
+    /**
+     * 缓存定义的规则
+     */
     private static volatile Map<String, List<FlowRule>> flowRules = new HashMap<>();
 
     private static final FlowPropertyListener LISTENER = new FlowPropertyListener();
