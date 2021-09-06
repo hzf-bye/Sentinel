@@ -58,16 +58,19 @@ public class Context {
 
     /**
      * Context name.
+     * Sentinel 调用上下文环境的名称。
      */
     private final String name;
 
     /**
      * The entrance node of current invocation tree.
+     * 调用链的入口节点信息。
      */
     private DefaultNode entranceNode;
 
     /**
      * Current processing entry.
+     * 调用链中当前节点的信息。
      */
     private Entry curEntry;
 
@@ -76,6 +79,9 @@ public class Context {
      */
     private String origin = "";
 
+    /**
+     * 是否是异步调用上下文环境。
+     */
     private final boolean async;
 
     /**

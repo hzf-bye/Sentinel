@@ -114,25 +114,38 @@ public class CtSph implements Sph {
         return asyncEntryWithPriorityInternal(resourceWrapper, count, false, args);
     }
 
+    /**
+     *
+     * @param resourceWrapper 资源的包装类型，可以是字符串类型的资源描述，也可以是方法类的。
+     * @param count 此次需要消耗的令牌。
+     * @param prioritized 是否注重优先级。
+     * @param args 额外参数。
+     */
     private Entry entryWithPriority(ResourceWrapper resourceWrapper, int count, boolean prioritized, Object... args)
         throws BlockException {
+        //获取方法调用的上下文环境，上下环境对象存储在线程本地变量( ThreadLocal )中，上下文环境中存储的是整个调用链。
         Context context = ContextUtil.getContext();
         if (context instanceof NullContext) {
             // The {@link NullContext} indicates that the amount of context has exceeded the threshold,
             // so here init the entry only. No rule checking will be done.
+            //CtEntry中的chain为空，因此不会触发流控相关的逻辑
             return new CtEntry(resourceWrapper, null, context);
         }
 
         if (context == null) {
             // Using default context.
+            //创建默认资源上下文 名称为：sentinel_default_context
             context = InternalContextUtil.internalEnter(Constants.CONTEXT_DEFAULT_NAME);
         }
 
+        //Sentinel 提供一个全局关闭的开关，如果关闭，返回的 CtEntry 中的 chain 为空，
+        //从这里可以看出，如果 chain 为空，则不会触发 Sentinel 流控相关的逻辑，从侧面也反应了该属性的重要性。
         // Global switch is close, no rule checking will do.
         if (!Constants.ON) {
             return new CtEntry(resourceWrapper, null, context);
         }
 
+        //为该资源加载处理链链，这里是最最重要的方法
         ProcessorSlot<Object> chain = lookProcessChain(resourceWrapper);
 
         /*
@@ -143,10 +156,13 @@ public class CtSph implements Sph {
             return new CtEntry(resourceWrapper, null, context);
         }
 
+        //根据资源ID、处理器链、上下文环境构建 CtEntry 对象
         Entry e = new CtEntry(resourceWrapper, chain, context);
         try {
+            //调用 chain 的 entry 方法
             chain.entry(context, resourceWrapper, null, count, prioritized, args);
         } catch (BlockException e1) {
+            //如果出现 BlockException ，调用 CtEntry 的 exit 方法。
             e.exit(count, args);
             throw e1;
         } catch (Throwable e1) {
@@ -192,16 +208,26 @@ public class CtSph implements Sph {
      * @return {@link ProcessorSlotChain} of the resource
      */
     ProcessorSlot<Object> lookProcessChain(ResourceWrapper resourceWrapper) {
+        /*
+         * chainMap 一个全局的缓存表，即同一个资源 ResourceWrapper (同一个资源名称) 会共同使用同一个 ProcessorSlotChain ，
+         * 即不同的线程在访问同一个资源保护的代码时，这些线程将共同使用 ProcessorSlotChain  中的各个 ProcessorSlot 。
+         * 注意留意 ResourceWrapper 的 equals 方法与 hashCode 方法：判断一个 ResourceWrapper 是否相等的标准是资源名称是否相同。
+         */
         ProcessorSlotChain chain = chainMap.get(resourceWrapper);
         if (chain == null) {
             synchronized (LOCK) {
                 chain = chainMap.get(resourceWrapper);
                 if (chain == null) {
                     // Entry size limit.
+                    /*
+                     * 这里重点想突出，如果同时在进入的资源个数超过 MAX_SLOT_CHAIN_SIZE，默认为 6000，会返回 null，
+                     * 则不对本次请求执行限流，熔断计算，而是直接跳过，这个点还是值得我们注意的。
+                     */
                     if (chainMap.size() >= Constants.MAX_SLOT_CHAIN_SIZE) {
                         return null;
                     }
 
+                    //通过 SlotChainProvider 创建对应的处理链。
                     chain = SlotChainProvider.newSlotChain();
                     Map<ResourceWrapper, ProcessorSlotChain> newMap = new HashMap<ResourceWrapper, ProcessorSlotChain>(
                         chainMap.size() + 1);
@@ -311,6 +337,8 @@ public class CtSph implements Sph {
 
     @Override
     public Entry entry(String name, EntryType type, int count, Object... args) throws BlockException {
+        //由于该方法用来表示资源的方式为一个字符串，故创建一个 StringResourceWrapper对象来表示一个 Sentinel 中的资源，
+        //另外一个实现为 MethodResourceWrapper，用来表示方法类型的资源。
         StringResourceWrapper resource = new StringResourceWrapper(name, type);
         return entry(resource, count, args);
     }

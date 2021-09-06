@@ -34,6 +34,7 @@ import com.alibaba.csp.sentinel.slotchain.StringResourceWrapper;
 import com.alibaba.csp.sentinel.spi.Spi;
 
 /**
+ * 用于集群限流、熔断。
  * <p>
  * This slot maintains resource running statistics (response time, qps, thread
  * count, exception), and a list of callers as well which is marked by
@@ -66,11 +67,15 @@ public class ClusterBuilderSlot extends AbstractLinkedProcessorSlot<DefaultNode>
      * become. so we don't concurrent map but a lock. as this lock only happens
      * at the very beginning while concurrent map will hold the lock all the time.
      * </p>
+     * 静态变量，全局的，所有资源以及对应的ClusterNode的缓存
      */
     private static volatile Map<ResourceWrapper, ClusterNode> clusterNodeMap = new HashMap<>();
 
     private static final Object lock = new Object();
 
+    /**
+     * 私有变量，局部的，当前资源对应的clusterNode
+     */
     private volatile ClusterNode clusterNode = null;
 
     @Override
@@ -84,6 +89,7 @@ public class ClusterBuilderSlot extends AbstractLinkedProcessorSlot<DefaultNode>
                     clusterNode = new ClusterNode(resourceWrapper.getName(), resourceWrapper.getResourceType());
                     HashMap<ResourceWrapper, ClusterNode> newMap = new HashMap<>(Math.max(clusterNodeMap.size(), 16));
                     newMap.putAll(clusterNodeMap);
+                    //一个资源名称一个clusterNode
                     newMap.put(node.getId(), clusterNode);
 
                     clusterNodeMap = newMap;

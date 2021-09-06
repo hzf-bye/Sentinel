@@ -23,9 +23,11 @@ import com.alibaba.csp.sentinel.SphO;
 import com.alibaba.csp.sentinel.SphU;
 import com.alibaba.csp.sentinel.context.Context;
 import com.alibaba.csp.sentinel.slotchain.ResourceWrapper;
+import com.alibaba.csp.sentinel.slots.clusterbuilder.ClusterBuilderSlot;
 import com.alibaba.csp.sentinel.slots.nodeselector.NodeSelectorSlot;
 
 /**
+ * 用于保存特定上下文中特定资源名称的统计信息
  * <p>
  * A {@link Node} used to hold statistics for specific resource name in the specific context.
  * Each distinct resource in each distinct {@link Context} will corresponding to a {@link DefaultNode}.
@@ -42,16 +44,21 @@ public class DefaultNode extends StatisticNode {
 
     /**
      * The resource associated with the node.
+     * 资源对象，即 DefaultNode 才真正与资源挂钩，可以将 DefaultNode 看出是调用链中的一个节点，并且与资源关联。
      */
     private ResourceWrapper id;
 
     /**
      * The list of all child nodes.
+     * 子节点结合。以此来维持其调用链。
      */
     private volatile Set<Node> childList = new HashSet<>();
 
     /**
      * Associated cluster node.
+     * 集群节点，同样为 StatisticNode 的子类，表示与资源集群相关的环境。
+     * @see ClusterBuilderSlot#entry(com.alibaba.csp.sentinel.context.Context, com.alibaba.csp.sentinel.slotchain.ResourceWrapper, com.alibaba.csp.sentinel.node.DefaultNode, int, boolean, java.lang.Object...)
+     * 中赋值
      */
     private ClusterNode clusterNode;
 
@@ -106,6 +113,10 @@ public class DefaultNode extends StatisticNode {
         return childList;
     }
 
+    /**
+     * DefaultNode 的此类方法，通常是先调用 StatisticNode 的方法，然后再调用 clusterNode 的相关方法，
+     * 最终就是使用在对应的滑动窗口中增加或减少计量值。
+     */
     @Override
     public void increaseBlockQps(int count) {
         super.increaseBlockQps(count);

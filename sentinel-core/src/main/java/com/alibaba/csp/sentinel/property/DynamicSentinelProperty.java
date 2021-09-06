@@ -54,6 +54,7 @@ public class DynamicSentinelProperty<T> implements SentinelProperty<T> {
 
         value = newValue;
         for (PropertyListener<T> listener : listeners) {
+            //回调listener
             listener.configUpdate(newValue);
         }
         return true;

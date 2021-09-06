@@ -29,6 +29,7 @@ import com.alibaba.csp.sentinel.slots.block.degrade.circuitbreaker.CircuitBreake
 import com.alibaba.csp.sentinel.spi.Spi;
 
 /**
+ * 实现熔断机制。
  * A {@link ProcessorSlot} dedicates to circuit breaking.
  *
  * @author Carpenter Lee

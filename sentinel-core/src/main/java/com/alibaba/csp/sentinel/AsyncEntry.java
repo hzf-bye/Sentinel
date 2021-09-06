@@ -23,6 +23,7 @@ import com.alibaba.csp.sentinel.slotchain.ResourceWrapper;
 
 /**
  * The entry for asynchronous resources.
+ * 异步调用调用信息的封装对象。
  *
  * @author Eric Zhao
  * @since 0.2.0

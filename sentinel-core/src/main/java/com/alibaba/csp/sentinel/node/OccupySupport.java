@@ -18,6 +18,7 @@ package com.alibaba.csp.sentinel.node;
 /**
  * @author Eric Zhao
  * @since 1.5.0
+ * 支持抢占未来的时间窗口，有点类似借用“未来”的令牌。
  */
 public interface OccupySupport {
 
@@ -36,6 +37,7 @@ public interface OccupySupport {
      * @param threshold    qps threshold.
      * @return time should sleep. Time >= {@code occupyTimeout} in {@link OccupyTimeoutProperty} means
      * occupy fail, in this case, the request should be rejected immediately.
+     * 尝试抢占未来的令牌，返回值为调用该方法的线程应该 sleep 的时间
      */
     long tryOccupyNext(long currentTime, int acquireCount, double threshold);
 
@@ -62,6 +64,7 @@ public interface OccupySupport {
     void addOccupiedPass(int acquireCount);
 
     /**
+     * 当前抢占未来令牌的QPS。
      * Get current occupied pass QPS.
      *
      * @return current occupied pass QPS

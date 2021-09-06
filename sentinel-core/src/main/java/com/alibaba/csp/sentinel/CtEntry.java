@@ -28,6 +28,7 @@ import com.alibaba.csp.sentinel.util.function.BiConsumer;
 
 /**
  * Linked entry within current context.
+ * 同步调用调用信息封装对象。
  *
  * @author jialiang.linjl
  * @author Eric Zhao

@@ -35,6 +35,7 @@ import com.alibaba.csp.sentinel.slots.nodeselector.NodeSelectorSlot;
  * @see ContextUtil
  * @see ContextUtil#enter(String, String)
  * @see NodeSelectorSlot
+ * 用来表示调用链入口的节点信息。
  */
 public class EntranceNode extends DefaultNode {
 

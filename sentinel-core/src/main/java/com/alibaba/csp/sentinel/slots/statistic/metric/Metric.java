@@ -23,6 +23,7 @@ import com.alibaba.csp.sentinel.util.function.Predicate;
 
 /**
  * Represents a basic structure recording invocation metrics of protected resources.
+ * 指标收集核心接口，主要定义一个滑动窗口中成功的数量、异常数量、阻塞数量，TPS、响应时间等数据。
  *
  * @author jialiang.linjl
  * @author Eric Zhao

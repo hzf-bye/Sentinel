@@ -106,6 +106,7 @@ public final class FlowRuleUtil {
             if (key == null) {
                 continue;
             }
+            //根据资源名称分组
             Set<FlowRule> flowRules = tmpMap.get(key);
 
             if (flowRules == null) {
@@ -116,6 +117,7 @@ public final class FlowRuleUtil {
 
             flowRules.add(rule);
         }
+        //同资源名称的流控规则排序
         Comparator<FlowRule> comparator = new FlowRuleComparator();
         for (Entry<K, Set<FlowRule>> entries : tmpMap.entrySet()) {
             List<FlowRule> rules = new ArrayList<>(entries.getValue());

@@ -29,18 +29,34 @@ import com.alibaba.csp.sentinel.util.function.Predicate;
 
 /**
  * The basic metric class in Sentinel using a {@link BucketLeapArray} internal.
+ * 指标收集核心接口，主要定义一个滑动窗口中成功的数量、异常数量、阻塞数量，TPS、响应时间等数据。
+ * 滑动窗口核心实现类。
  *
  * @author jialiang.linjl
  * @author Eric Zhao
  */
 public class ArrayMetric implements Metric {
 
+    /**
+     * 滑动窗口顶层数据结构，用来存储各个窗口的数据
+     */
     private final LeapArray<MetricBucket> data;
 
+    /**
+     *
+     * @param sampleCount 在一个采集间隔中抽样的个数，默认为 2，例如当 intervalInMs = 1000时，抽样两次，则一个采集间隔中会包含两个相等的区间，一个区间就是滑动窗口。
+     * @param intervalInMs 表示一个采集的时间间隔，例如1秒，1分钟。单位是毫秒
+     */
     public ArrayMetric(int sampleCount, int intervalInMs) {
         this.data = new OccupiableBucketLeapArray(sampleCount, intervalInMs);
     }
 
+    /**
+     *
+     * @param sampleCount 在一个采集间隔中抽样的个数，默认为 2，例如当 intervalInMs = 1000时，抽样两次，则一个采集间隔中会包含两个相等的区间，一个区间就是滑动窗口。
+     * @param intervalInMs 表示一个采集的时间间隔，例如1秒，1分钟。单位是毫秒
+     * @param enableOccupy 是否允许抢占，即当前时间戳已经达到限制后，是否可以占用下一个时间窗口的容量，这里对应 LeapArray 的两个实现类，如果允许抢占，则为 OccupiableBucketLeapArray，否则为 BucketLeapArray。
+     */
     public ArrayMetric(int sampleCount, int intervalInMs, boolean enableOccupy) {
         if (enableOccupy) {
             this.data = new OccupiableBucketLeapArray(sampleCount, intervalInMs);

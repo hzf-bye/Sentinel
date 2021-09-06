@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
+ * 实现限流机制。
  * <p>
  * Combined the runtime statistics collected from the previous
  * slots (NodeSelectorSlot, ClusterNodeBuilderSlot, and StatisticSlot), FlowSlot
@@ -158,11 +159,23 @@ public class FlowSlot extends AbstractLinkedProcessorSlot<DefaultNode> {
         this.checker = checker;
     }
 
+    /**
+     *
+     * @param context         current {@link Context} 当前 Sentinel 调用的上下文。
+     * @param resourceWrapper current resource 当前访问的资源。
+     * @param node 当前上下文环境对应的节点。
+     * @param count           tokens needed 本次调用需要消耗的“令牌”个数
+     * @param prioritized     whether the entry is prioritized 是否是高优先级。
+     * @param args            parameters of the original call 额外参数。
+     * @throws Throwable
+     */
     @Override
     public void entry(Context context, ResourceWrapper resourceWrapper, DefaultNode node, int count,
                       boolean prioritized, Object... args) throws Throwable {
+        //根据配置的限流规则，结合实时统计信息，判断是否满足流控条件，如果满足，则触发流控
         checkFlow(resourceWrapper, context, node, count, prioritized);
 
+        //调用 fireEntry 继续沿着 slot 链进行传播。
         fireEntry(context, resourceWrapper, node, count, prioritized, args);
     }
 

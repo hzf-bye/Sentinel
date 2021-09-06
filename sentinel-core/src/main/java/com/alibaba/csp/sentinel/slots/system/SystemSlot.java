@@ -24,6 +24,7 @@ import com.alibaba.csp.sentinel.slotchain.ResourceWrapper;
 import com.alibaba.csp.sentinel.spi.Spi;
 
 /**
+ * 用于验证系统级别的规则。
  * A {@link ProcessorSlot} that dedicates to {@link SystemRule} checking.
  *
  * @author jialiang.linjl

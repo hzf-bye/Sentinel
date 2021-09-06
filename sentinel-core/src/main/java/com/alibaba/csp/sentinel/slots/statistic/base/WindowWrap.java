@@ -21,6 +21,7 @@ package com.alibaba.csp.sentinel.slots.statistic.base;
  * @param <T> data type
  * @author jialiang.linjl
  * @author Eric Zhao
+ * 每一个滑动窗口的包装类，其内部的数据结构用 MetricBucket 表示。
  */
 public class WindowWrap<T> {
 

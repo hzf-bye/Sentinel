@@ -136,10 +136,10 @@ public interface Sph extends SphResourceTypeSupport {
      * Record statistics and perform rule checking for the given resource.
      *
      * @param name        the unique name for the protected resource
-     * @param trafficType the traffic type (inbound, outbound or internal). This is used
+     * @param trafficType the traffic type (inbound, outbound or internal). This is used 资源的名称。
      *                    to mark whether it can be blocked when the system is unstable,
-     *                    only inbound traffic could be blocked by {@link SystemRule}
-     * @param batchCount  the amount of calls within the invocation (e.g. batchCount=2 means request for 2 tokens)
+     *                    only inbound traffic could be blocked by {@link SystemRule} 进入资源的方式，主要包含 EntryType.IN、EntryType.OUT。
+     * @param batchCount  the amount of calls within the invocation (e.g. batchCount=2 means request for 2 tokens) 可以理解为本次进入需要消耗的“令牌数”。
      * @param args        args for parameter flow control or customized slots
      * @return the {@link Entry} of this invocation (used for mark the invocation complete and get context data)
      * @throws BlockException if the block criteria is met

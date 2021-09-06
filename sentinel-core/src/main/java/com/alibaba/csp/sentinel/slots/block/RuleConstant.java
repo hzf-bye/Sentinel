@@ -16,6 +16,7 @@
 package com.alibaba.csp.sentinel.slots.block;
 
 import com.alibaba.csp.sentinel.node.IntervalProperty;
+import com.alibaba.csp.sentinel.slots.block.flow.FlowRule;
 
 /**
  * @author youji.zj
@@ -42,8 +43,21 @@ public final class RuleConstant {
     public static final int AUTHORITY_WHITE = 0;
     public static final int AUTHORITY_BLACK = 1;
 
+    /**
+     * 下面3个解释详见
+     * @see FlowRule#strategy
+     */
+    /**
+     * 根据调用方限流策略
+     */
     public static final int STRATEGY_DIRECT = 0;
+    /**
+     * 关联流量限流策略
+     */
     public static final int STRATEGY_RELATE = 1;
+    /**
+     * 根据调用链入口限流策略
+     */
     public static final int STRATEGY_CHAIN = 2;
 
     public static final int CONTROL_BEHAVIOR_DEFAULT = 0;
@@ -59,6 +73,10 @@ public final class RuleConstant {
     public static final int RELEASE_RESOURCE_TIMEOUT_STRATEGY = 1;
     public static final int KEEP_RESOURCE_TIMEOUT_STRATEGY = 2;
 
+    /**
+     * limitApp解释详见
+     * @see com.alibaba.csp.sentinel.slots.block.AbstractRule#limitApp
+     */
     public static final String LIMIT_APP_DEFAULT = "default";
     public static final String LIMIT_APP_OTHER = "other";
 

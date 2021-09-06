@@ -40,9 +40,22 @@ import com.alibaba.csp.sentinel.util.TimeUtil;
  */
 public abstract class LeapArray<T> {
 
+    /**
+     * 每一个窗口的时间间隔，单位为毫秒。
+     */
     protected int windowLengthInMs;
+    /**
+     * 抽样个数，就一个统计时间间隔中包含的滑动窗口个数，在 intervalInMs 相同的情况下，sampleCount 越多，抽样的统计数据就越精确，相应的需要的内存也越多。
+     */
     protected int sampleCount;
+    /**
+     * 一个统计的时间间隔，单位为毫秒。
+     */
     protected int intervalInMs;
+
+    /**
+     * 一个统计的时间间隔，单位为秒。
+     */
     private double intervalInSecond;
 
     protected final AtomicReferenceArray<WindowWrap<T>> array;
@@ -94,6 +107,12 @@ public abstract class LeapArray<T> {
      * @param startTime  the start time of the bucket in milliseconds
      * @param windowWrap current bucket
      * @return new clean bucket at given start time
+     * 下面的示例以采集间隔为 1 s，抽样次数为 2。
+     * 1. 首先会创建一个 LeapArray，内部持有一个数组，元素为 2,一开始进行采集时，数组的第一个，第二个下标都会 null，
+     * 例如当前时间经过 calculateTimeIdx 定位到下标为 0，此时没有滑动窗口，会创建一个滑动窗口，
+     * 然后该滑动窗口会采集指标，随着进入 1s 的后500ms，后会创建第二个抽样窗口。
+     * 2、 然后时间前进 1s，又会定位到下标为 0 的地方，但此时不会为空，因为有上一秒的采集数据，
+     * 故需要将这些采集数据丢弃 ( MetricBucket value )，然后重置该窗口的 windowStart，这就是 resetWindowTo 方法的作用。
      */
     protected abstract WindowWrap<T> resetWindowTo(WindowWrap<T> windowWrap, long startTime);
 
@@ -112,14 +131,26 @@ public abstract class LeapArray<T> {
      *
      * @param timeMillis a valid timestamp in milliseconds
      * @return current bucket item at provided timestamp if the time is valid; null if time is invalid
+     *
      */
     public WindowWrap<T> currentWindow(long timeMillis) {
         if (timeMillis < 0) {
             return null;
         }
 
+        /*
+         * 计算当前时间会落在一个采集间隔 ( LeapArray ) 中哪一个时间窗口中，
+         * 即在 LeapArray 中属性 AtomicReferenceArray > array 的下标。其实现算法如下：
+         * 1. 首先用当前时间除以一个时间窗口的时间间隔，得出当前时间是多少个时间窗口的倍数，用 n 表示。
+         * 2. 然后我们可以看出从一系列时间窗口，从 0 开始，一起向前滚动 n 隔得到当前时间戳代表的时间窗口的位置。现在我们要定位到这个时间窗口的位置是落在 LeapArray 中数组的下标，而一个 LeapArray 中包含 sampleCount 个元素，要得到其下标，则使用 n % sampleCount 即可。
+         */
         int idx = calculateTimeIdx(timeMillis);
         // Calculate current bucket start time.
+        /*
+         * 计算当前时间戳所在的时间窗口的开始时间，即要计算出 WindowWrap 中 windowStart 的值，
+         * 其实就是要算出小于当前时间戳，并且是 windowLengthInMs 的整数倍最大的数字，
+         * Sentinel 给出是算法为 ( timeMillis - timeMillis % windowLengthInMs )。
+         */
         long windowStart = calculateWindowStart(timeMillis);
 
         /*
@@ -129,8 +160,11 @@ public abstract class LeapArray<T> {
          * (2) Bucket is up-to-date, then just return the bucket.
          * (3) Bucket is deprecated, then reset current bucket and clean all deprecated buckets.
          */
+        // 死循环查找当前的时间窗口，这里之所有需要循环，是因为可能多个线程都在获取当前时间窗口。
         while (true) {
+            //尝试从 LeapArray 中的 WindowWrap 数组查找指定下标的元素。
             WindowWrap<T> old = array.get(idx);
+            //如果指定下标的元素为空，则需要创建一个 WindowWrap 。其中 WindowWrap 中的 MetricBucket 是调用其抽象方法 newEmptyBucket (timeMillis)，由不同的子类去实现。
             if (old == null) {
                 /*
                  *     B0       B1      B2    NULL      B4
@@ -145,6 +179,11 @@ public abstract class LeapArray<T> {
                  * succeed to update, while other threads yield its time slice.
                  */
                 WindowWrap<T> window = new WindowWrap<T>(windowLengthInMs, windowStart, newEmptyBucket(timeMillis));
+                /*
+                 * 这里使用了 CAS 机制来更新 LeapArray 数组中的 元素，因为同一时间戳，可能有多个线程都在获取当前时间窗口对象，
+                 * 但该时间窗口对象还未创建，这里就是避免创建多个，导致统计数据被覆盖，如果用 CAS 更新成功的线程，则返回新建好的 WindowWrap ，
+                 * CAS 设置不成功的线程继续跑这个流程，然后会进入到代码
+                 */
                 if (array.compareAndSet(idx, null, window)) {
                     // Successfully updated, return the created bucket.
                     return window;
@@ -153,6 +192,7 @@ public abstract class LeapArray<T> {
                     Thread.yield();
                 }
             } else if (windowStart == old.windowStart()) {
+                //如果指定索引下的时间窗口对象不为空并判断起始时间相等，则返回。
                 /*
                  *     B0       B1      B2     B3      B4
                  * ||_______|_______|_______|_______|_______||___
@@ -166,6 +206,7 @@ public abstract class LeapArray<T> {
                  */
                 return old;
             } else if (windowStart > old.windowStart()) {
+                //如果原先存在的窗口开始时间小于当前时间戳计算出来的开始时间，则表示 bucket 已被弃用。则需要将开始时间重置到新时间戳对应的开始时间戳，重置的逻辑将在下文详细介绍。
                 /*
                  *   (old)
                  *             B0       B1      B2    NULL      B4
@@ -195,6 +236,7 @@ public abstract class LeapArray<T> {
                     Thread.yield();
                 }
             } else if (windowStart < old.windowStart()) {
+                //应该不会进入到该分支，因为当前时间算出来时间窗口不会比之前的小。
                 // Should not go through here, as the provided time is already behind.
                 return new WindowWrap<T>(windowLengthInMs, windowStart, newEmptyBucket(timeMillis));
             }
@@ -203,6 +245,7 @@ public abstract class LeapArray<T> {
 
     /**
      * Get the previous bucket item before provided timestamp.
+     * 根据当前时间获取前一个有效滑动窗口
      *
      * @param timeMillis a valid timestamp in milliseconds
      * @return the previous bucket item before provided timestamp
@@ -211,14 +254,18 @@ public abstract class LeapArray<T> {
         if (timeMillis < 0) {
             return null;
         }
+        //用当前时间减去一个时间窗口间隔，然后去定位所在 LeapArray 中 数组的下标。
+        //相当于timeMillis/windowLengthInMs-1
         int idx = calculateTimeIdx(timeMillis - windowLengthInMs);
         timeMillis = timeMillis - windowLengthInMs;
         WindowWrap<T> wrap = array.get(idx);
 
+        //如果为空或已过期，则返回 null。
         if (wrap == null || isWindowDeprecated(wrap)) {
             return null;
         }
 
+        //如果定位的窗口的开始时间再加上 windowLengthInMs 小于 timeMills ，说明失效，则返回 null，通常是不会走到该分支。
         if (wrap.windowStart() + windowLengthInMs < (timeMillis)) {
             return null;
         }
@@ -267,6 +314,10 @@ public abstract class LeapArray<T> {
         return isWindowDeprecated(TimeUtil.currentTimeMillis(), windowWrap);
     }
 
+    /**
+     * 判断滑动窗口是否生效的依据是当系统时间与滑动窗口的开始时间戳的间隔大于一个采集时间，即表示过期。
+     * 即从当前窗口开始，通常包含的有效窗口为 sampleCount 个有效滑动窗口。
+     */
     public boolean isWindowDeprecated(long time, WindowWrap<T> windowWrap) {
         return time - windowWrap.windowStart() > intervalInMs;
     }

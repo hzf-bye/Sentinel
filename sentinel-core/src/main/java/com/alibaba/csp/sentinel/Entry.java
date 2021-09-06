@@ -16,6 +16,8 @@
 package com.alibaba.csp.sentinel;
 
 import com.alibaba.csp.sentinel.slots.block.BlockException;
+import com.alibaba.csp.sentinel.slots.clusterbuilder.ClusterBuilderSlot;
+import com.alibaba.csp.sentinel.slots.nodeselector.NodeSelectorSlot;
 import com.alibaba.csp.sentinel.util.TimeUtil;
 import com.alibaba.csp.sentinel.util.function.BiConsumer;
 import com.alibaba.csp.sentinel.context.ContextUtil;
@@ -55,16 +57,36 @@ public abstract class Entry implements AutoCloseable {
 
     private static final Object[] OBJECTS0 = new Object[0];
 
+    /**
+     * 创建entry的时间
+     */
     private final long createTimestamp;
+
+    /**
+     * 执行完slot后未发生BlockException的完成时间
+     */
     private long completeTimestamp;
 
+    /**
+     * @see NodeSelectorSlot#entry(com.alibaba.csp.sentinel.context.Context, com.alibaba.csp.sentinel.slotchain.ResourceWrapper, java.lang.Object, int, boolean, java.lang.Object...)
+     * 处赋值
+     */
     private Node curNode;
     /**
      * {@link Node} of the specific origin, Usually the origin is the Service Consumer.
+     * 针对相同的资源名称的不同的来源都会创建一个originNode
+     * @see ClusterBuilderSlot#entry(com.alibaba.csp.sentinel.context.Context, com.alibaba.csp.sentinel.slotchain.ResourceWrapper, com.alibaba.csp.sentinel.node.DefaultNode, int, boolean, java.lang.Object...)
      */
     private Node originNode;
 
+    /**
+     * 执行系统异常error
+     */
     private Throwable error;
+
+    /**
+     * 执行slot过程中发生的BlockException
+     */
     private BlockException blockError;
 
     protected final ResourceWrapper resourceWrapper;

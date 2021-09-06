@@ -24,9 +24,15 @@ import java.util.concurrent.atomic.LongAdder;
  *
  * @author jialiang.linjl
  * @author Eric Zhao
+ * 指标桶，例如通过数量、阻塞数量、异常数量、成功数量、响应时间，已通过未来配额（抢占下一个滑动窗口的数量）。
  */
 public class MetricBucket {
 
+    /**
+     * @see MetricEvent
+     * 数组下标从0开始对应枚举MetricEvent中的ordinal()值
+     * 接counters[0].sum()代表通过数量
+     */
     private final LongAdder[] counters;
 
     private volatile long minRt;

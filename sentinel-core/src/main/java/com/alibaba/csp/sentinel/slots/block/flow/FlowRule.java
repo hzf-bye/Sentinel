@@ -48,49 +48,99 @@ public class FlowRule extends AbstractRule {
 
     /**
      * The threshold type of flow control (0: thread count, 1: QPS).
+     * 流量控制的阈值类型
+     * 0-并发线程数，1-QPS
      */
     private int grade = RuleConstant.FLOW_GRADE_QPS;
 
     /**
      * Flow control threshold count.
+     * 基于grade的流控阈值
      */
     private double count;
 
     /**
      * Flow control strategy based on invocation chain.
+     * 基于调用链的流控制策略
+     * {@link RuleConstant#STRATEGY_DIRECT} for direct flow control (by origin); 根据调用方限流策略
      *
-     * {@link RuleConstant#STRATEGY_DIRECT} for direct flow control (by origin);
-     * {@link RuleConstant#STRATEGY_RELATE} for relevant flow control (with relevant resource);
-     * {@link RuleConstant#STRATEGY_CHAIN} for chain flow control (by entrance resource).
+     *
+     * {@link RuleConstant#STRATEGY_CHAIN} for chain flow control (by entrance resource). 关联流量限流策略
+     *
+     * NodeSelectorSlot 中记录了资源之间的调用链路，这些资源通过调用关系，相互之间构成一棵调用树。这棵树的根节点是一个名字为 machine-root 的虚拟节点，调用链的入口都是这个虚节点的子节点。
+     * 一棵典型的调用树如下图所示：
+     *
+     *         machine-root
+     *          /      \
+     *         /        \
+     *    Entrance1   Entrance2
+     *      /               \
+     *     /                 \
+     *  DefaultNode(nodeA)  DefaultNode(nodeA)
+     *  上图中来自入口 Entrance1 和 Entrance2 的请求都调用到了资源 NodeA（入口名称不同，资源名称相同。），Sentinel 允许只根据某个入口的统计信息对资源限流。
+     *  比如我们可以设置 FlowRule.strategy 为 RuleConstant.CHAIN，同时设置 FlowRule.refResource 为 Entrance1 来表示只有从入口 Entrance1 的调用才会记录到 NodeA 的限流统计当中，
+     *  而对来自 Entrance2 的调用漠不关心。
+     *  详见源码{@link FlowRuleChecker#selectReferenceNode(com.alibaba.csp.sentinel.slots.block.flow.FlowRule, com.alibaba.csp.sentinel.context.Context, com.alibaba.csp.sentinel.node.DefaultNode)}
+     *      * 中当strategy = RuleConstant.STRATEGY_CHAIN获取node的逻辑。
+     *
+     *
+     * {@link RuleConstant#STRATEGY_RELATE} for relevant flow control (with relevant resource); 根据调用链入口限流策略
+     * 当两个资源之间具有资源争抢或者依赖关系的时候，这两个资源便具有了关联。比如对数据库同一个字段的读操作和写操作存在争抢，读的速度过高会影响写得速度，写的速度过高会影响读的速度。
+     * 如果放任读写操作争抢资源，则争抢本身带来的开销会降低整体的吞吐量。可使用关联限流来避免具有关联关系的资源之间过度的争抢，
+     * 举例来说，read_db 和 write_db 这两个资源分别代表数据库读写，
+     * 我们可以给 read_db 设置限流规则来达到写优先的目的：设置 FlowRule.strategy 为 RuleConstant.RELATE 同时设置 FlowRule.refResource 为 write_db。
+     * 这样当写库操作过于频繁时，读数据的请求会被限流，即当前read_db资源是否可读的条件为资源write_db是否被限流，如果write_db会限流则不允许read_db资源进行读操作。
+     * 详见源码{@link FlowRuleChecker#selectReferenceNode(com.alibaba.csp.sentinel.slots.block.flow.FlowRule, com.alibaba.csp.sentinel.context.Context, com.alibaba.csp.sentinel.node.DefaultNode)}
+     * 中当strategy = RuleConstant.STRATEGY_RELATE获取node的逻辑。
      */
     private int strategy = RuleConstant.STRATEGY_DIRECT;
 
     /**
      * Reference resource in flow control with relevant resource or context.
+     * 1. strategy = RuleConstant.STRATEGY_DIRECT时无异议
+     * 2. strategy = RuleConstant.STRATEGY_CHAIN表示链路中的context上下文名称
+     * 3. strategy = RuleConstant.STRATEGY_STRATEGY_RELATE表示关联的资源名称
+     * 详见源码{@link FlowRuleChecker#selectReferenceNode(com.alibaba.csp.sentinel.slots.block.flow.FlowRule, com.alibaba.csp.sentinel.context.Context, com.alibaba.csp.sentinel.node.DefaultNode)}
      */
     private String refResource;
 
     /**
      * Rate limiter control behavior.
      * 0. default(reject directly), 1. warm up, 2. rate limiter, 3. warm up + rate limiter
+     * 流量控制后的采取的行为
+     * 0-直接拒绝，该方式是默认的流量控制方式，当QPS超过任意规则的阈值后，新的请求就会被立即拒绝，拒绝方式为抛出FlowException
+     * 1-冷启动、该方式主要用于系统长期处于低水位的情况下，当流量突然增加时，直接把系统拉升到高水位可能瞬间把系统压垮。通过"冷启动"，让通过的流量缓慢增加，在一定时间内逐渐增加到阈值上限，给冷系统一个预热的时间，避免冷系统被压垮的情况
+     * 2-匀速排队、这种方式严格控制了请求通过的间隔时间，也即是让请求以均匀的速度通过，对应的是漏桶算法
+     * 3-预热与匀速排队
      */
     private int controlBehavior = RuleConstant.CONTROL_BEHAVIOR_DEFAULT;
 
+    /**
+     * 预热时间，如果 controlBehavior 设置为预热(warm up)时，可以配置其预热时间，
+     * 在【新增流控规则界面】中选择 warm up 类型后，会增加一行，供用户配置，默认值 10s。
+     */
     private int warmUpPeriodSec = 10;
 
     /**
      * Max queueing time in rate limiter behavior.
+     * 最大超时时间，如果 controlBehavior 设置为排队等待时，等待的最大超时时间，默认为500ms。
      */
     private int maxQueueingTimeMs = 500;
 
+    /**
+     * 是否是集群限流模式，对应【新增流控规则界面】的是否集群。
+     */
     private boolean clusterMode;
     /**
      * Flow rule config for cluster mode.
+     * 集群扩容相关配置。
      */
     private ClusterFlowConfig clusterConfig;
 
     /**
      * The traffic shaping (throttling) controller.
+     * @see FlowRuleUtil#buildFlowRuleMap(java.util.List, com.alibaba.csp.sentinel.util.function.Function, com.alibaba.csp.sentinel.util.function.Predicate, boolean)
+     * 处赋值
      */
     private TrafficShapingController controller;
 
@@ -102,6 +152,7 @@ public class FlowRule extends AbstractRule {
         this.controlBehavior = controlBehavior;
         return this;
     }
+
 
     public int getMaxQueueingTimeMs() {
         return maxQueueingTimeMs;

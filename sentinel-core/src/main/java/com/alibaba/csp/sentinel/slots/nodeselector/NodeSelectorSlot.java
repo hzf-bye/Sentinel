@@ -29,6 +29,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
+ * 主要用于构建调用链
  * </p>
  * This class will try to build the calling traces via
  * <ol>
@@ -129,9 +130,19 @@ public class NodeSelectorSlot extends AbstractLinkedProcessorSlot<Object> {
 
     /**
      * {@link DefaultNode}s of the same resource in different context.
+     * 定义一个 Map，其键为上下文环境 Context 的名称，通常是进入节点的名称
      */
     private volatile Map<String, DefaultNode> map = new HashMap<String, DefaultNode>(10);
 
+    /**
+     * @param context         current {@link Context} 调用上下文环境，该对象存储在 ThreadLocal，其名称在调用链的入口处设置。
+     * @param resourceWrapper current resource 资源的包装类，注意留意其 equals 与 hashCode 方法，判断两个对象是否相等的依据是资源名
+     * 称是否相同。
+     * @param obj 参数。
+     * @param count           tokens needed 本次需要消耗的令牌数量。
+     * @param prioritized     whether the entry is prioritized 请求是否按优先级排列。
+     * @param args            parameters of the original call 额外参数。
+     */
     @Override
     public void entry(Context context, ResourceWrapper resourceWrapper, Object obj, int count, boolean prioritized, Object... args)
         throws Throwable {
@@ -153,17 +164,24 @@ public class NodeSelectorSlot extends AbstractLinkedProcessorSlot<Object> {
          * The answer is all {@link DefaultNode}s with same resource name share one
          * {@link ClusterNode}. See {@link ClusterBuilderSlot} for detail.
          */
+        //如果缓存中存在对应该上下文环境的节点，则直接使用，并将其节点设置当前调用上下文的当前节点中(Context)。
         DefaultNode node = map.get(context.getName());
+        //如果节点为空，则进入到节点创建流程，此过程需要加锁
         if (node == null) {
             synchronized (this) {
                 node = map.get(context.getName());
                 if (node == null) {
+                    //创建一个新的 DefaultNode
                     node = new DefaultNode(resourceWrapper, null);
                     HashMap<String, DefaultNode> cacheMap = new HashMap<String, DefaultNode>(map.size());
                     cacheMap.putAll(map);
                     cacheMap.put(context.getName(), node);
                     map = cacheMap;
                     // Build invocation tree
+                    /*
+                     * 构建调用链，由于 NodeSelectorSlot 是第一个进入的处理器，故此时 Context 的 curEntry 为 null ，
+                     * 故这里就是创建的上下文环境名称对应的节点会被添加到 ContextUtil 的 entry方法 创建的调用链入口节点(EntranceNode)，
+                     */
                     ((DefaultNode) context.getLastNode()).addChild(node);
                 }
 

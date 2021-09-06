@@ -50,6 +50,7 @@ public class FlowRuleManager {
 
     /**
      * 缓存定义的规则
+     * FlowRuleManager的内部静态类FlowPropertyListener#configUpdate方法将规则更新到缓存，缓存在FlowRuleManager的成员变量flowRules中。
      */
     private static volatile Map<String, List<FlowRule>> flowRules = new HashMap<>();
 
@@ -57,13 +58,21 @@ public class FlowRuleManager {
      * 回调的Listener实现
      */
     private static final FlowPropertyListener LISTENER = new FlowPropertyListener();
+
+    /**
+     * 用于注册Listener
+     */
     private static SentinelProperty<List<FlowRule>> currentProperty = new DynamicSentinelProperty<List<FlowRule>>();
 
     @SuppressWarnings("PMD.ThreadPoolCreationRule")
     private static final ScheduledExecutorService SCHEDULER = Executors.newScheduledThreadPool(1,
         new NamedThreadFactory("sentinel-metrics-record-task", true));
 
+    /**
+     * FlowRuleManager通过静态方法将FlowPropertyListener注册到DynamicSentinelProperty中。
+     */
     static {
+        //将FlowPropertyListener注册到currentProperty中
         currentProperty.addListener(LISTENER);
         startMetricTimerListener();
     }
@@ -154,6 +163,9 @@ public class FlowRuleManager {
 
     private static final class FlowPropertyListener implements PropertyListener<List<FlowRule>> {
 
+        /**
+         * 回调执行方法，更新缓存规则
+         */
         @Override
         public synchronized void configUpdate(List<FlowRule> value) {
             Map<String, List<FlowRule>> rules = FlowRuleUtil.buildFlowRuleMap(value);
