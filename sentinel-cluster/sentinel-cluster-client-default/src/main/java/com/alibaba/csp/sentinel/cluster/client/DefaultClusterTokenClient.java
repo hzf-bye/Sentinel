@@ -66,10 +66,17 @@ public class DefaultClusterTokenClient implements ClusterTokenClient {
         return descriptor.getHost().equals(config.getServerHost()) && descriptor.getPort() == config.getServerPort();
     }
 
+    /**
+     * 初始化与服务端的链接信息
+     */
     private void initNewConnection() {
         if (transportClient != null) {
             return;
         }
+        /**
+         * 获取服务端的ip:port，初始化信息见官方demo
+         * {@link com.alibaba.csp.sentinel.demo.cluster.init.DemoClusterInitFunc#initClientServerAssignProperty()}
+         */
         String host = ClusterClientConfigManager.getServerHost();
         int port = ClusterClientConfigManager.getServerPort();
         if (StringUtil.isBlank(host) || port <= 0) {
@@ -151,6 +158,7 @@ public class DefaultClusterTokenClient implements ClusterTokenClient {
         if (notValidRequest(flowId, acquireCount)) {
             return badRequest();
         }
+        //向服务端请求token，服务端对应的处理方法为com.alibaba.csp.sentinel.cluster.flow.DefaultTokenService.requestToken
         FlowRequestData data = new FlowRequestData().setCount(acquireCount)
             .setFlowId(flowId).setPriority(prioritized);
         ClusterRequest<FlowRequestData> request = new ClusterRequest<>(ClusterConstants.MSG_TYPE_FLOW, data);

@@ -30,15 +30,29 @@ import com.alibaba.csp.sentinel.util.TimeUtil;
 /**
  * @author Eric Zhao
  * @since 1.8.0
+ * RT降级策略类
  */
 public class ResponseTimeCircuitBreaker extends AbstractCircuitBreaker {
 
     private static final double SLOW_REQUEST_RATIO_MAX_VALUE = 1.0d;
 
+    /**
+     * 允许的最大的RT，规则中的count四舍五入结果
+     */
     private final long maxAllowedRt;
+    /**
+     * RT 模式下慢请求率的阈值。即slowRatioThreshold比例的请求的RT>=count那么就应该处降级了。
+     */
     private final double maxSlowRequestRatio;
+    /**
+     *  熔断触发的最小请求数，比如请求数小于该值时即使RT比率超出阈值也不会熔断
+     */
     private final int minRequestAmount;
 
+    /**
+     * RT策略的滑动窗口实现类
+     * 默认一秒钟统计一次，即时间周期是1s，每个窗口的间隔是1s
+     */
     private final LeapArray<SlowRequestCounter> slidingCounter;
 
     public ResponseTimeCircuitBreaker(DegradeRule rule) {
@@ -63,17 +77,21 @@ public class ResponseTimeCircuitBreaker extends AbstractCircuitBreaker {
 
     @Override
     public void onRequestComplete(Context context) {
+        //获取当前时间窗口的数据
         SlowRequestCounter counter = slidingCounter.currentWindow().value();
         Entry entry = context.getCurEntry();
         if (entry == null) {
             return;
         }
+        //指定完成的时间
         long completeTime = entry.getCompleteTimestamp();
         if (completeTime <= 0) {
+            //说明发生了BlockException
             completeTime = TimeUtil.currentTimeMillis();
         }
         long rt = completeTime - entry.getCreateTimestamp();
         if (rt > maxAllowedRt) {
+            //rt大于阈值，慢请求+1
             counter.slowCount.add(1);
         }
         counter.totalCount.add(1);
@@ -82,6 +100,7 @@ public class ResponseTimeCircuitBreaker extends AbstractCircuitBreaker {
     }
 
     private void handleStateChangeWhenThresholdExceeded(long rt) {
+        ////断路器开着的直接返回。
         if (currentState.get() == State.OPEN) {
             return;
         }
@@ -89,14 +108,19 @@ public class ResponseTimeCircuitBreaker extends AbstractCircuitBreaker {
         if (currentState.get() == State.HALF_OPEN) {
             // In detecting request
             // TODO: improve logic for half-open recovery
+            ////如果是在半开状态发生异常了那么进入OPEN态
             if (rt > maxAllowedRt) {
                 fromHalfOpenToOpen(1.0d);
             } else {
+                //如果是在半开状态未发生异常了那么进入CLOSE态
                 fromHalfOpenToClose();
             }
             return;
         }
 
+        //如果是CLOSE态那么计算阈值
+
+        //获取当前时间所在的时间窗口的统计数据
         List<SlowRequestCounter> counters = slidingCounter.values();
         long slowCount = 0;
         long totalCount = 0;
@@ -104,13 +128,16 @@ public class ResponseTimeCircuitBreaker extends AbstractCircuitBreaker {
             slowCount += counter.slowCount.sum();
             totalCount += counter.totalCount.sum();
         }
+        //小于最小请求数忽略
         if (totalCount < minRequestAmount) {
             return;
         }
         double currentRatio = slowCount * 1.0d / totalCount;
+        //慢请求比例超过阈值，并更新恢复时间
         if (currentRatio > maxSlowRequestRatio) {
             transformToOpen(currentRatio);
         }
+        //如果请求比例等于阈值且阈值为1那么也需要拒绝，并更新恢复时间
         if (Double.compare(currentRatio, maxSlowRequestRatio) == 0 &&
                 Double.compare(maxSlowRequestRatio, SLOW_REQUEST_RATIO_MAX_VALUE) == 0) {
             transformToOpen(currentRatio);

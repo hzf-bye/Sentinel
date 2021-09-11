@@ -57,6 +57,7 @@ public class TokenClientHandler extends ChannelInboundHandlerAdapter {
             ClusterResponse<?> response = (ClusterResponse) msg;
 
             if (response.getType() == ClusterConstants.MSG_TYPE_PING) {
+                //ping请求处理，会记录namespace信息
                 handlePingResponse(ctx, response);
                 return;
             }

@@ -23,6 +23,8 @@ import com.alibaba.csp.sentinel.Tracer;
 import com.alibaba.csp.sentinel.context.ContextUtil;
 import com.alibaba.csp.sentinel.log.RecordLog;
 import com.alibaba.csp.sentinel.slots.block.BlockException;
+import com.alibaba.csp.sentinel.slots.block.RuleConstant;
+import com.alibaba.csp.sentinel.slots.block.flow.FlowRule;
 import com.alibaba.dubbo.common.extension.Activate;
 import com.alibaba.dubbo.rpc.Filter;
 import com.alibaba.dubbo.rpc.Invocation;
@@ -64,6 +66,10 @@ public class SentinelDubboProviderFilter extends AbstractDubboFilter implements 
             String prefix = DubboAdapterGlobalConfig.getDubboProviderPrefix();
             String methodResourceName = getMethodResourceName(invoker, invocation, prefix);
             String interfaceName = getInterfaceName(invoker, prefix);
+            //
+            /** 设置不同的入口名称
+             * 当{@link FlowRule#strategy}的值为#{@link RuleConstant#STRATEGY_CHAIN}可以针对不同的入口进行限流。
+             */
             ContextUtil.enter(methodResourceName, origin);
             interfaceEntry = SphU.entry(interfaceName, ResourceTypeConstants.COMMON_RPC, EntryType.IN);
             methodEntry = SphU.entry(methodResourceName, ResourceTypeConstants.COMMON_RPC,

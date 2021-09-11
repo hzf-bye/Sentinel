@@ -27,12 +27,18 @@ public final class RuleConstant {
     public static final int FLOW_GRADE_THREAD = 0;
     public static final int FLOW_GRADE_QPS = 1;
 
+
+    /**
+     * RT
+     */
     public static final int DEGRADE_GRADE_RT = 0;
     /**
+     * 异常比例
      * Degrade by biz exception ratio in the current {@link IntervalProperty#INTERVAL} second(s).
      */
     public static final int DEGRADE_GRADE_EXCEPTION_RATIO = 1;
     /**
+     * 异常数，过去60s
      * Degrade by biz exception count in the last 60 seconds.
      */
     public static final int DEGRADE_GRADE_EXCEPTION_COUNT = 2;
@@ -60,6 +66,12 @@ public final class RuleConstant {
      */
     public static final int STRATEGY_CHAIN = 2;
 
+    /**
+     * 0-直接拒绝，该方式是默认的流量控制方式，当QPS超过任意规则的阈值后，新的请求就会被立即拒绝，拒绝方式为抛出FlowException
+     * 1-冷启动、该方式主要用于系统长期处于低水位的情况下，当流量突然增加时，直接把系统拉升到高水位可能瞬间把系统压垮。通过"冷启动"，让通过的流量缓慢增加，在一定时间内逐渐增加到阈值上限，给冷系统一个预热的时间，避免冷系统被压垮的情况
+     * 2-匀速排队、这种方式严格控制了请求通过的间隔时间，也即是让请求以均匀的速度通过，对应的是漏桶算法
+     * 3-预热与匀速排队
+     */
     public static final int CONTROL_BEHAVIOR_DEFAULT = 0;
     public static final int CONTROL_BEHAVIOR_WARM_UP = 1;
     public static final int CONTROL_BEHAVIOR_RATE_LIMITER = 2;

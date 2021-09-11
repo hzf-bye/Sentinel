@@ -247,6 +247,8 @@ public final class DegradeRuleManager {
                 if (StringUtil.isBlank(rule.getLimitApp())) {
                     rule.setLimitApp(RuleConstant.LIMIT_APP_DEFAULT);
                 }
+
+                //创建或者直接从缓存中获取CircuitBreaker
                 CircuitBreaker cb = getExistingSameCbOrNew(rule);
                 if (cb == null) {
                     RecordLog.warn("[DegradeRuleManager] Unknown circuit breaking strategy, ignoring: {}", rule);

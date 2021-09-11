@@ -192,12 +192,23 @@ public class FlowRuleChecker {
     private static boolean passClusterCheck(FlowRule rule, Context context, DefaultNode node, int acquireCount,
                                             boolean prioritized) {
         try {
+            /*
+             * 获取一个 TokenService 服务类。这里实现关键点：
+             * 1. 如果当前节点的角色为 CLIENT，返回的 TokenService 为 DefaultClusterTokenClient。
+             * 2. 如果当前节点的角色为 SERVER，返回的 TokenService 为 ClusterTokenServer，
+             * 这里使用了SPI极致，可以通过查看 META-INF/services 目录下的 com.alibaba.csp.sentinel.cluster.TokenService 文件，
+             * 默认服务端返回 DefaultTokenService。
+             */
             TokenService clusterService = pickClusterService();
             if (clusterService == null) {
+                //如果无法获取到集群限流Token服务，如果该限流规则配置了可以退化为单机限流模式，则退化为单机限流。
                 return fallbackToLocalOrPass(rule, context, node, acquireCount, prioritized);
             }
+            //获取集群限流的流程ID，该 flowId 全局唯一。
             long flowId = rule.getClusterConfig().getFlowId();
+            //通过 TokenService 去申请 token，这里是与单机限流模式最大的差别。
             TokenResult result = clusterService.requestToken(flowId, acquireCount, prioritized);
+            //处理服务端返回的结果
             return applyTokenResult(result, rule, context, node, acquireCount, prioritized);
             // If client is absent, then fallback to local mode.
         } catch (Throwable ex) {

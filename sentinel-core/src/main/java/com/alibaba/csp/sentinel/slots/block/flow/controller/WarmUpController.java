@@ -60,13 +60,29 @@ import com.alibaba.csp.sentinel.slots.block.flow.TrafficShapingController;
  * </p>
  *
  * @author jialiang.linjl
+ * 预热策略的实现
  */
 public class WarmUpController implements TrafficShapingController {
 
+    /**
+     * 流控规则设定的阔值。
+     */
     protected double count;
+    /**
+     * 冷却因子。
+     */
     private int coldFactor;
+    /**
+     * 需要警告的令牌数
+     */
     protected int warningToken = 0;
+    /**
+     * 最大令牌数
+     */
     private int maxToken;
+    /**
+     * 需要算法指定的斜率slope
+     */
     protected double slope;
 
     protected AtomicLong storedTokens = new AtomicLong(0);
@@ -112,15 +128,21 @@ public class WarmUpController implements TrafficShapingController {
 
     @Override
     public boolean canPass(Node node, int acquireCount, boolean prioritized) {
+        //先获取当前节点已通过的QPS。
         long passQps = (long) node.passQps();
 
+        //获取当前滑动窗口的前一个窗口收集的已通过QPS。
         long previousQps = (long) node.previousPassQps();
+        //调用 syncToken 更新 storedTokens 与 lastFilledTime 的值，即按照令牌发放速率发送指定令牌，
         syncToken(previousQps);
 
         // 开始计算它的斜率
         // 如果进入了警戒线，开始调整他的qps
         long restToken = storedTokens.get();
+        //如果当前存储的许可大于warningToken的处理逻辑，主要是在预热阶段允许通过的速率会比限流规则设定的速率要低，
+        //判断是否通过的依据就是当前通过的TPS与申请的许可数是否小于当前的速率（这个值加入斜率，即在预热期间，速率是慢慢达到设定速率的。
         if (restToken >= warningToken) {
+            //剩余的令牌数量较多，并且超过了警戒令牌数量，那么需要进行严格限制
             long aboveToken = restToken - warningToken;
             // 消耗的速度要比warning快，但是要比慢
             // current interval = restToken*slope+1/count
@@ -129,6 +151,7 @@ public class WarmUpController implements TrafficShapingController {
                 return true;
             }
         } else {
+            //当前存储的许可小于warningToken，则按照规则设定的速率进行判定。
             if (passQps + acquireCount <= count) {
                 return true;
             }

@@ -31,6 +31,7 @@ import java.util.Collection;
  *
  * @author Eric Zhao
  * @since 1.4.0
+ * Token Server 端收到客户的请求，其处理入口为 FlowRequestProcessor，其处理方法为：processRequest，最终会调用 DefaultTokenService 的 requestToken 方法。
  */
 @Spi(isDefault = true)
 public class DefaultTokenService implements TokenService {
@@ -41,11 +42,17 @@ public class DefaultTokenService implements TokenService {
             return badRequest();
         }
         // The rule should be valid.
+        /**
+         * 根据 ruleId 获取指定的限流规则。
+         */
         FlowRule rule = ClusterFlowRuleManager.getFlowRuleById(ruleId);
         if (rule == null) {
             return new TokenResult(TokenResultStatus.NO_RULE_EXISTS);
         }
 
+        /**
+         * 然后调用 ClusterFlowChecker 的 acquireClusterToken 方法，申请许可。
+         */
         return ClusterFlowChecker.acquireClusterToken(rule, acquireCount, prioritized);
     }
 

@@ -34,6 +34,8 @@ public final class ClusterClientConfigManager {
 
     /**
      * Client config properties.
+     * 初始化信息见官方demo
+     * {@link com.alibaba.csp.sentinel.demo.cluster.init.DemoClusterInitFunc#initClientServerAssignProperty()}
      */
     private static volatile String serverHost = null;
     private static volatile int serverPort = ClusterConstants.DEFAULT_CLUSTER_SERVER_PORT;

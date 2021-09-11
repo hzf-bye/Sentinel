@@ -15,6 +15,8 @@
  */
 package com.alibaba.csp.sentinel.slots.statistic.base;
 
+import com.alibaba.csp.sentinel.slots.statistic.data.MetricBucket;
+
 /**
  * Wrapper entity class for a period of time window.
  *
@@ -37,6 +39,8 @@ public class WindowWrap<T> {
 
     /**
      * Statistic data.
+     * @see MetricBucket
+     * @see com.alibaba.csp.sentinel.cluster.flow.statistic.data.ClusterMetricBucket
      */
     private T value;
 

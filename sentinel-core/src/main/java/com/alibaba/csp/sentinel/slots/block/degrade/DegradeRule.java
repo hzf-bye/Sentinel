@@ -55,22 +55,35 @@ public class DegradeRule extends AbstractRule {
 
     /**
      * Circuit breaking strategy (0: average RT, 1: exception ratio, 2: exception count).
+     * 熔断策略
+     * 0-RT
+     * 1-异常比例 {@link com.alibaba.csp.sentinel.node.IntervalProperty#INTERVAL}时间内的异常率
+     * 2-异常数，默认过去60s的异常数与count比较
      */
     private int grade = RuleConstant.DEGRADE_GRADE_RT;
 
     /**
      * Threshold count.
+     * 规则中对应的配置值
+     *
+     * strategy=0时表示 错误率 RT
+     * strategy=1时表示 错误率 0-1之间
+     * strategy=2时表示 错误数
+     *
      */
     private double count;
 
     /**
      * Recovery timeout (in seconds) when circuit breaker opens. After the timeout, the circuit breaker will
      * transform to half-open state for trying a few requests.
+     * 降级发生后多久进行恢复，即结束降级，单位为毫秒。
+     * 超时后，将进入半开状态，通过一些请求，以判断是否恢复。
      */
     private int timeWindow;
 
     /**
      * Minimum number of requests (in an active statistic time span) that can trigger circuit breaking.
+     * 熔断触发的最小请求数，比如请求数小于该值时即使异常比率超出阈值也不会熔断
      *
      * @since 1.7.0
      */
@@ -78,9 +91,13 @@ public class DegradeRule extends AbstractRule {
 
     /**
      * The threshold of slow request ratio in RT mode.
+     * RT 模式下慢请求率的阈值。即slowRatioThreshold比例的请求的RT>=count那么就应该处降级了。
      */
     private double slowRatioThreshold = 1.0d;
 
+    /**
+     * 统计时长（单位为 ms），如 60*1000 代表分钟级（1.8.0 引入）
+     */
     private int statIntervalMs = 1000;
 
     public int getGrade() {

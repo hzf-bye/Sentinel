@@ -65,8 +65,6 @@ public class FlowRule extends AbstractRule {
      * {@link RuleConstant#STRATEGY_DIRECT} for direct flow control (by origin); 根据调用方限流策略
      *
      *
-     * {@link RuleConstant#STRATEGY_CHAIN} for chain flow control (by entrance resource). 关联流量限流策略
-     *
      * NodeSelectorSlot 中记录了资源之间的调用链路，这些资源通过调用关系，相互之间构成一棵调用树。这棵树的根节点是一个名字为 machine-root 的虚拟节点，调用链的入口都是这个虚节点的子节点。
      * 一棵典型的调用树如下图所示：
      *
@@ -82,9 +80,10 @@ public class FlowRule extends AbstractRule {
      *  而对来自 Entrance2 的调用漠不关心。
      *  详见源码{@link FlowRuleChecker#selectReferenceNode(com.alibaba.csp.sentinel.slots.block.flow.FlowRule, com.alibaba.csp.sentinel.context.Context, com.alibaba.csp.sentinel.node.DefaultNode)}
      *      * 中当strategy = RuleConstant.STRATEGY_CHAIN获取node的逻辑。
+     * {@link RuleConstant#STRATEGY_CHAIN} for chain flow control (by entrance resource). 根据调用链入口限流策略
      *
      *
-     * {@link RuleConstant#STRATEGY_RELATE} for relevant flow control (with relevant resource); 根据调用链入口限流策略
+     * {@link RuleConstant#STRATEGY_RELATE} for relevant flow control (with relevant resource); 关联流量限流策略
      * 当两个资源之间具有资源争抢或者依赖关系的时候，这两个资源便具有了关联。比如对数据库同一个字段的读操作和写操作存在争抢，读的速度过高会影响写得速度，写的速度过高会影响读的速度。
      * 如果放任读写操作争抢资源，则争抢本身带来的开销会降低整体的吞吐量。可使用关联限流来避免具有关联关系的资源之间过度的争抢，
      * 举例来说，read_db 和 write_db 这两个资源分别代表数据库读写，
@@ -123,7 +122,7 @@ public class FlowRule extends AbstractRule {
 
     /**
      * Max queueing time in rate limiter behavior.
-     * 最大超时时间，如果 controlBehavior 设置为排队等待时，等待的最大超时时间，默认为500ms。
+     * 最大超时时间，如果 controlBehavior 设置为匀速排队策略时，等待的最大超时时间，默认为500ms。
      */
     private int maxQueueingTimeMs = 500;
 

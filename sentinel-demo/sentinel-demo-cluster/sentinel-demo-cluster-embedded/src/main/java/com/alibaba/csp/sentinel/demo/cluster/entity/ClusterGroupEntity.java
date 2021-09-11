@@ -23,10 +23,22 @@ import java.util.Set;
  */
 public class ClusterGroupEntity {
 
+    /**
+     * Token 服务端的机器ID。
+     */
     private String machineId;
+    /**
+     * Token 服务端的 IP。
+     */
     private String ip;
+    /**
+     * Token 服务端的机器端口。
+     */
     private Integer port;
 
+    /**
+     * 客户端 Set 集合。
+     */
     private Set<String> clientSet;
 
     public String getMachineId() {

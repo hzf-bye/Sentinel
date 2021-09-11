@@ -22,6 +22,7 @@ import com.alibaba.csp.sentinel.slotchain.ProcessorSlotEntryCallback;
 import com.alibaba.csp.sentinel.slotchain.ProcessorSlotExitCallback;
 import com.alibaba.csp.sentinel.slots.block.flow.PriorityWaitException;
 import com.alibaba.csp.sentinel.slots.block.flow.controller.DefaultController;
+import com.alibaba.csp.sentinel.slots.statistic.metric.occupy.OccupiableBucketLeapArray;
 import com.alibaba.csp.sentinel.spi.Spi;
 import com.alibaba.csp.sentinel.util.TimeUtil;
 import com.alibaba.csp.sentinel.Constants;
@@ -102,6 +103,8 @@ public class StatisticSlot extends AbstractLinkedProcessorSlot<DefaultNode> {
              * 中抛出此异常，说明抢占下一个滑动窗口的令牌成功。
              * 如果捕获到 PriorityWaitException ，则认为是等待过一定时间，但最终还是算通过，这里只需增加线程的个数，
              * 而DefaultController#canPass()中会增加节点分钟级别级别通过的数量。
+             * 之所以不增加秒级别通过的节点的格式是因为在{@link OccupiableBucketLeapArray#resetWindowTo(com.alibaba.csp.sentinel.slots.statistic.base.WindowWrap, long)}
+             * 中在重置时间窗口的时候才会把已借用的令牌数加到当前时间窗口中。
              */
             node.increaseThreadNum();
             if (context.getCurEntry().getOriginNode() != null) {

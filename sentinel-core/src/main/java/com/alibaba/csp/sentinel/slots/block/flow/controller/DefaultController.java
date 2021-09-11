@@ -33,7 +33,17 @@ public class DefaultController implements TrafficShapingController {
 
     private static final int DEFAULT_AVG_USED_TOKENS = 0;
 
+    /**
+     * 基于grade的流控阈值 每秒的请求数或者当前的并发线程数
+     */
     private double count;
+
+    /**
+     * 流量控制的阈值类型
+     * 0-并发线程数，1-QPS
+     * @see RuleConstant#FLOW_GRADE_THREAD
+     * @see RuleConstant#FLOW_GRADE_QPS
+     */
     private int grade;
 
     public DefaultController(double count, int grade) {
@@ -64,6 +74,7 @@ public class DefaultController implements TrafficShapingController {
                 if (waitInMs < OccupyTimeoutProperty.getOccupyTimeout()) {
                     node.addWaitingRequest(currentTime + waitInMs, acquireCount);
                     node.addOccupiedPass(acquireCount);
+                    //这里等待的时间，默认情况下就是当前时间距离下一个时间窗口的时间，
                     sleep(waitInMs);
 
                     // PriorityWaitException indicates that the request will pass after waiting for {@link @waitInMs}.

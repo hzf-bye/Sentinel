@@ -30,13 +30,22 @@ public class ClusterFlowConfig {
 
     /**
      * Global unique ID.
+     * 全局唯一的规则 ID，由集群限流管控端分配.
      */
     private Long flowId;
 
     /**
      * Threshold type (average by local value or global value).
+     * 阈值模式，
+     * 默认（0）为单机均摊，总qps阈值等于机器数*单机qps阈值
+     * 1 为全局阈值，全局阈值等于整个集群配置的阈值
+     * 详见
+     * @see com.alibaba.csp.sentinel.cluster.flow.ClusterFlowChecker#calcGlobalThreshold(com.alibaba.csp.sentinel.slots.block.flow.FlowRule)
      */
     private int thresholdType = ClusterRuleConstant.FLOW_THRESHOLD_AVG_LOCAL;
+    /**
+     * 在 client 连接失败或通信失败等等原因时，是否退化到本地的限流模式
+     */
     private boolean fallbackToLocalWhenFail = true;
 
     /**

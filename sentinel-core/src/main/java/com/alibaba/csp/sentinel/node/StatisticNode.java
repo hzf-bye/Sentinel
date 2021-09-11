@@ -322,17 +322,32 @@ public class StatisticNode implements Node {
      * @param currentTime  current time millis. 当前时间。
      * @param acquireCount tokens count to acquire. 本次需要申请的令牌个数。
      * @param threshold    qps threshold. 设置的阔值。
-     * @return
+     * 参考 https://www.jianshu.com/p/0da9fca33aa6
      */
     @Override
     public long tryOccupyNext(long currentTime, int acquireCount, double threshold) {
+        //一个周期内允许通过的最大的令牌数量，一个周期默认值为IntervalProperty.INTERVAL / 1000s
         double maxCount = threshold * IntervalProperty.INTERVAL / 1000;
+        //当前已借用的未来令牌数量
         long currentBorrow = rollingCounterInSecond.waiting();
         if (currentBorrow >= maxCount) {
+            //借用失败
             return OccupyTimeoutProperty.getOccupyTimeout();
         }
 
+        //时间窗口间隔
         int windowLength = IntervalProperty.INTERVAL / SampleCountProperty.SAMPLE_COUNT;
+
+        /* currentTime - currentTime % windowLength + windowLength 表示 当前时间所在所在的时间窗口的结束时间
+         * 再减去IntervalProperty.INTERVAL（两个时间窗口的间隔？） 表示 当前时间所在时间窗口的上一个时间窗口的开始时间？
+         *     B0       B1      B2    NULL      B4
+         * ||_______|_______|_______|_______|_______||___
+         * 0       500     1000     1500     2000   2500  timestamp
+         *          ^            ^
+         *      earliestTime currentTime=1288
+         *    如图currentTime=1288 那么earliestTime=500
+         * 也就是earliestTime所在的时间窗口与如图currentTime所在的时间窗口合起来是一个周期，默认值为1s(IntervalProperty.INTERVAL的值)
+         */
         long earliestTime = currentTime - currentTime % windowLength + windowLength - IntervalProperty.INTERVAL;
 
         int idx = 0;
@@ -341,16 +356,37 @@ public class StatisticNode implements Node {
          * since call rollingCounterInSecond.pass(). So in high concurrency, the following code may
          * lead more tokens be borrowed.
          */
+        //currentPass指当前时间所在时间窗口所在的周期通过的令牌数
         long currentPass = rollingCounterInSecond.pass();
+        /*
+         * 整个方法最终结果是想得到一个等待的时间，但是该等待时间也是有最大限制的。
+         * 在while循环内，earliestTime一定要小于currentTime的，currentTime比earliestTime大((SampleCountProperty.SAMPLE_COUNT-1)个窗口时间+currentTime % windowLength)这么多时间值，
+         * idx表示已经遍历次数。
+         */
         while (earliestTime < currentTime) {
+            /*
+             * 当第一次时，waitInMs的时间其实时当前时间窗口的下一个窗口开始时间减去当前时间，意思就是等待waitInMs，就是下一个窗口的开始时间了（比如currentTime=1288，windowLength=500，那么waitInMs=212）。
+             * 当第二次时即idx=1，默认情况下waitInMs=windowLength+第一次的waitInMs，肯定大于OccupyTimeoutProperty.getOccupyTimeout()了。说明抢占未来令牌失败。
+             */
             long waitInMs = idx * windowLength + windowLength - currentTime % windowLength;
             if (waitInMs >= OccupyTimeoutProperty.getOccupyTimeout()) {
                 break;
             }
+            //获取earliestTime所在窗口通过的令牌数
             long windowPass = rollingCounterInSecond.getWindowPass(earliestTime);
+            /*
+             * currentPass + currentBorrow + acquireCount标识当前窗口所在周期已经通过的令牌数（当前时间所在时间窗口所在的周期+借用未来的） 与 当前需要申请的令牌数（acquireCount）
+             * 减去windowPass相当于减去了当前窗口的上一个窗口通过的令牌数，2个窗口合在一起算一个周期。剩下的值就是当前时间窗口通过的值 + acquireCount。
+             * 所以此处就是校验如果当前时间窗口所通过的令牌数（包括占用未来的）+ acquireCount必须小于等于maxCount，也就是限制了占用未来令牌的数量。
+             *
+             */
             if (currentPass + currentBorrow + acquireCount - windowPass <= maxCount) {
+                //如果小于那么说明是可以占用未来的令牌数的，等待waitInMs即可，
+                //第一次进来waitInMs标识当前时间距离下一个时间窗口的间隔。
                 return waitInMs;
             }
+            //说明当前周期已经不允许占用未来令牌了。
+            //earliestTime加一个时间窗口间隔，相应的currentPass减去之前earliestTime所在时间窗口的通过的令牌数。
             earliestTime += windowLength;
             currentPass -= windowPass;
             idx++;

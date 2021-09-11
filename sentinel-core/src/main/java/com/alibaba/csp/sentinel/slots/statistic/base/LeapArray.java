@@ -161,6 +161,7 @@ public abstract class LeapArray<T> {
          * (3) Bucket is deprecated, then reset current bucket and clean all deprecated buckets.
          */
         // 死循环查找当前的时间窗口，这里之所有需要循环，是因为可能多个线程都在获取当前时间窗口。
+        //下面逻辑参考同目录下的LeadArray.png示意图
         while (true) {
             //尝试从 LeapArray 中的 WindowWrap 数组查找指定下标的元素。
             WindowWrap<T> old = array.get(idx);
@@ -227,6 +228,7 @@ public abstract class LeapArray<T> {
                 if (updateLock.tryLock()) {
                     try {
                         // Successfully get the update lock, now we reset the bucket.
+                        // 重置时间窗口的数据，之前的已经过期了。
                         return resetWindowTo(old, windowStart);
                     } finally {
                         updateLock.unlock();

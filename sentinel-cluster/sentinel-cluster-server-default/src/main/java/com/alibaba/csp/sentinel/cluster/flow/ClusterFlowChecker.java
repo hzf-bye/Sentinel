@@ -55,19 +55,39 @@ final class ClusterFlowChecker {
     static TokenResult acquireClusterToken(/*@Valid*/ FlowRule rule, int acquireCount, boolean prioritized) {
         Long id = rule.getClusterConfig().getFlowId();
 
+        /*
+         * 首先判断是否允许本次许可申请，这是因为 TokenServe 支持嵌入式，即支持在应用节点中嵌入一个 TokenServer，
+         * 为了保证许可申请的请求不对正常业务造成比较大的影响，故对申请许可这个动作进行了限流。
+         * 一旦触发了限流，将向客户端返回 TOO_MANY_REQUEST 状态码，Sentinel 支持按 namespace 进行限流，
+         * 具体由 GlobalRequestLimiter 实现，该类的内部同样基于滑动窗口进行收集，原理与 FlowSlot 相似，，默认的限流TPS为3W，
+         */
         if (!allowProceed(id)) {
+            //客户端将会降级为单机限流
             return new TokenResult(TokenResultStatus.TOO_MANY_REQUEST);
         }
 
+        //根据流程ID获取指标采集器。
         ClusterMetric metric = ClusterMetricStatistics.getMetric(id);
         if (metric == null) {
+            //客户端将会降级为单机限流
             return new TokenResult(TokenResultStatus.FAIL);
         }
 
+        //获取当前正常访问的QPS。
         double latestQps = metric.getAvg(ClusterFlowEvent.PASS);
+        /*
+         * 根据限流配置规则得出其总许可数量，其主要根据阔值的方式其有所不同，其配置阔值有两种方式：
+         * 1. FLOW_THRESHOLD_GLOBAL
+         * 总数，即集群中的许可等于限流规则中配置的 count 值。
+         * 2. FLOW_THRESHOLD_AVG_LOCAL
+         * 单机分摊模式，此时限流规则中配置的值只是单机的 count 值，集群中的许可数等于 count * 集群中客户端的个数。
+         * 注意：这里还可以通过 exceedCount 设置来运行超过其最大阔值，默认为1表示不允许超过。
+         */
         double globalThreshold = calcGlobalThreshold(rule) * ClusterServerConfigManager.getExceedCount();
+        //表示处理完本次请求后剩余的许可数量。
         double nextRemaining = globalThreshold - latestQps - acquireCount;
 
+        //如果剩余的许可数大于0，则本次申请成功，将当前的调用计入指标采集器中，然后返回给客户即可。
         if (nextRemaining >= 0) {
             // TODO: checking logic and metric operation should be separated.
             metric.add(ClusterFlowEvent.PASS, acquireCount);
@@ -81,10 +101,13 @@ final class ClusterFlowChecker {
                 .setRemaining((int) nextRemaining)
                 .setWaitInMs(0);
         } else {
+            //当前许可数不足的情况，并且该请求为高优先级的处理逻辑：
             if (prioritized) {
                 // Try to occupy incoming buckets.
+                ////获取当前等待的TPS（即1s为维度，当前等待的请求数量）
                 double occupyAvg = metric.getAvg(ClusterFlowEvent.WAITING);
                 if (occupyAvg <= ClusterServerConfigManager.getMaxOccupyRatio() * globalThreshold) {
+                    //如果当前等待的TPS低于可借用未来窗口的许可阔值时，可通过，但设置其等待时间，可以通过 maxOccupyRatio 来设置借用的最大比值。
                     int waitInMs = metric.tryOccupyNext(ClusterFlowEvent.PASS, acquireCount, globalThreshold);
                     // waitInMs > 0 indicates pre-occupy incoming buckets successfully.
                     if (waitInMs > 0) {
@@ -97,6 +120,7 @@ final class ClusterFlowChecker {
                 }
             }
             // Blocked.
+            //如果当前许可不足，并且该请求为普通优先级的处理逻辑，增加阻塞相关指标的统计数，并返回 BLOCKED。
             metric.add(ClusterFlowEvent.BLOCK, acquireCount);
             metric.add(ClusterFlowEvent.BLOCK_REQUEST, 1);
             ClusterServerStatLogUtil.log("flow|block|" + id, acquireCount);

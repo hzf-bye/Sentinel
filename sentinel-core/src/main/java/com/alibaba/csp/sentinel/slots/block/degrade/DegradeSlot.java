@@ -47,11 +47,13 @@ public class DegradeSlot extends AbstractLinkedProcessorSlot<DefaultNode> {
     }
 
     void performChecking(Context context, ResourceWrapper r) throws BlockException {
+        //首先从熔断规则缓存中获取资源的熔断规则
         List<CircuitBreaker> circuitBreakers = DegradeRuleManager.getCircuitBreakers(r.getName());
         if (circuitBreakers == null || circuitBreakers.isEmpty()) {
             return;
         }
         for (CircuitBreaker cb : circuitBreakers) {
+            //调用熔断规则 CircuitBreaker 的  tryPass，如果该方法返回 false，则表示需要熔断，则抛出 DegradeException 异常。
             if (!cb.tryPass(context)) {
                 throw new DegradeException(cb.getRule().getLimitApp(), cb.getRule());
             }
@@ -61,16 +63,19 @@ public class DegradeSlot extends AbstractLinkedProcessorSlot<DefaultNode> {
     @Override
     public void exit(Context context, ResourceWrapper r, int count, Object... args) {
         Entry curEntry = context.getCurEntry();
+        //当前发生BlockException那么继续传播exit事件，然后直接返回
         if (curEntry.getBlockError() != null) {
             fireExit(context, r, count, args);
             return;
         }
+        //获取当前资源对应的所有降级规则
         List<CircuitBreaker> circuitBreakers = DegradeRuleManager.getCircuitBreakers(r.getName());
         if (circuitBreakers == null || circuitBreakers.isEmpty()) {
             fireExit(context, r, count, args);
             return;
         }
 
+        //在没有发生BlockException的前提下在记录相关信息
         if (curEntry.getBlockError() == null) {
             // passed request
             for (CircuitBreaker circuitBreaker : circuitBreakers) {
