@@ -41,14 +41,11 @@ public enum MetricEvent {
     /**
      * 成功数量
      * @see StatisticSlot#recordCompleteFor(com.alibaba.csp.sentinel.node.Node, int, long, java.lang.Throwable)
-     * 中记录，说明不管是否发生BlockException或者其他Exception都会记录此数值，
-     * 含义应该是Sentinel，执行
-     * @see CtSph#entryWithPriority(com.alibaba.csp.sentinel.slotchain.ResourceWrapper, int, boolean, java.lang.Object...)
-     * 方法的次数
+     * 中记录未发生BlockException时记录此数值，
      */
     SUCCESS,
     /**
-     * 响应时间，通SUCCESS逻辑
+     * 响应时间，同SUCCESS逻辑
      */
     RT,
 

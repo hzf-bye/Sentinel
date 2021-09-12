@@ -31,6 +31,7 @@ import com.alibaba.csp.sentinel.property.SentinelProperty;
 import com.alibaba.csp.sentinel.property.SimplePropertyListener;
 import com.alibaba.csp.sentinel.slotchain.ResourceWrapper;
 import com.alibaba.csp.sentinel.slots.block.BlockException;
+import com.alibaba.csp.sentinel.slots.statistic.StatisticSlot;
 
 /**
  * <p>
@@ -95,6 +96,7 @@ public final class SystemRuleManager {
     static {
         checkSystemStatus.set(false);
         statusListener = new SystemStatusListener();
+        //每秒采集一次
         scheduler.scheduleAtFixedRate(statusListener, 0, 1, TimeUnit.SECONDS);
         currentProperty.addListener(listener);
     }
@@ -292,17 +294,28 @@ public final class SystemRuleManager {
             return;
         }
         // Ensure the checking switch is on.
+        //如果系统自适应开关为打开，直接放行，该开关初始化时为 false，在加载到一条系统自适应配置规则时该状态会设置为 true，具体在 loadSystemConf 中。
+        /**
+         * @see SystemRuleManager#loadSystemConf(com.alibaba.csp.sentinel.slots.system.SystemRule)处赋值
+         */
         if (!checkSystemStatus.get()) {
             return;
         }
 
         // for inbound traffic only
+        //如果资源的类型不是入口流量(EntryType.IN),则直接放行。
         if (resourceWrapper.getEntryType() != EntryType.IN) {
             return;
         }
 
         // total qps
+        /**
+         * Constants.ENTRY_NODE的qps信息在中记录
+         * @see StatisticSlot#entry(com.alibaba.csp.sentinel.context.Context, com.alibaba.csp.sentinel.slotchain.ResourceWrapper, com.alibaba.csp.sentinel.node.DefaultNode, int, boolean, java.lang.Object...)
+         */
         double currentQps = Constants.ENTRY_NODE == null ? 0.0 : Constants.ENTRY_NODE.successQps();
+        //如果当前调用的 QPS 大于设定的QPS，即触发限流
+        //如果一个应用同一个限流点（LOAD、QPS)设置了多条规则，最小值生效。
         if (currentQps > qps) {
             throw new SystemBlockException(resourceWrapper.getName(), "qps");
         }
@@ -319,6 +332,8 @@ public final class SystemRuleManager {
         }
 
         // load. BBR algorithm.
+        //如果当前系统的负载超过了设定的阔值的处理逻辑，这里就是自适应的核心所在，并不是超过负载就限流，
+        //而是需要根据当前系统的请求处理能力进行综合判断，具体逻辑在 checkBbr 方法中实现
         if (highestSystemLoadIsSet && getCurrentSystemAvgLoad() > highestSystemLoad) {
             if (!checkBbr(currentThread)) {
                 throw new SystemBlockException(resourceWrapper.getName(), "load");
@@ -326,11 +341,22 @@ public final class SystemRuleManager {
         }
 
         // cpu usage
+        //如果当前CPU的负载超过了设置的阔值，触发限流
         if (highestCpuUsageIsSet && getCurrentCpuUsage() > highestCpuUsage) {
             throw new SystemBlockException(resourceWrapper.getName(), "cpu");
         }
     }
 
+    /**
+     * 在 Sentinel 中估算系统的容量是以 1s 为度量长度，用该秒内通过的最大 qps 与 最小响应时间的乘积来表示，具体的计算细节：
+     * 1. maxSuccessQps 的计算取当前采样窗口的最大值乘以1s内滑动窗口的个数，这里其实并不是十分准确。
+     * 2. minRt 最小响应时间取自当前采样窗口中的最小响应时间。
+     * 故得出了上述计算公式，除以1000是因为 minRt 的时间单位是毫秒，统一为秒。从这里可以看出根据系统负载做限流，最终的判断依据是线程数量。
+     * Constants.ENTRY_NODE.maxSuccessQps() * Constants.ENTRY_NODE.minRt() / 1000 从单位角度来说 count/s * (ms*1000) = count
+     * count表示请求数，每个请求都需要一个线程去处理，说明当天系统的负载只支持count个请求，如果当前线程大于count那么需要限流
+     * 详见官方文档 把系统处理请求的过程想象为一个水管 https://sentinelguard.io/zh-cn/docs/system-adaptive-protection.html
+     *
+     */
     private static boolean checkBbr(int currentThread) {
         if (currentThread > 1 &&
             currentThread > Constants.ENTRY_NODE.maxSuccessQps() * Constants.ENTRY_NODE.minRt() / 1000) {
