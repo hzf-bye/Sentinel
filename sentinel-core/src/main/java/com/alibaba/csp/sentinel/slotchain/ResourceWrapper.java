@@ -30,6 +30,9 @@ public abstract class ResourceWrapper {
     protected final String name;
 
     protected final EntryType entryType;
+    /**
+     * @see com.alibaba.csp.sentinel.ResourceTypeConstants
+     */
     protected final int resourceType;
 
     public ResourceWrapper(String name, EntryType entryType, int resourceType) {

@@ -44,7 +44,13 @@ import com.alibaba.csp.sentinel.util.AssertUtil;
  */
 public class ClusterNode extends StatisticNode {
 
+    /**
+     * 资源名称
+     */
     private final String name;
+    /**
+     * @see ResourceTypeConstants
+     */
     private final int resourceType;
 
     public ClusterNode(String name) {
@@ -64,6 +70,8 @@ public class ClusterNode extends StatisticNode {
      * So we didn't use concurrent map here, but a lock, as this lock only happens
      * at the very beginning while concurrent map will hold the lock all the time.
      * </p>
+     * key-访问同一个资源对应的不同的来源
+     *
      */
     private Map<String, StatisticNode> originCountMap = new HashMap<>();
 

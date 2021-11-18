@@ -65,6 +65,7 @@ public class Context {
     /**
      * The entrance node of current invocation tree.
      * 调用链的入口节点信息。
+     * @see ContextUtil#trueEnter(java.lang.String, java.lang.String)
      */
     private DefaultNode entranceNode;
 

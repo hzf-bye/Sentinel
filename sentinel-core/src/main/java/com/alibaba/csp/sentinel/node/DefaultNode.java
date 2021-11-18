@@ -59,6 +59,7 @@ public class DefaultNode extends StatisticNode {
      * 集群节点，同样为 StatisticNode 的子类，表示与资源集群相关的环境。
      * @see ClusterBuilderSlot#entry(com.alibaba.csp.sentinel.context.Context, com.alibaba.csp.sentinel.slotchain.ResourceWrapper, com.alibaba.csp.sentinel.node.DefaultNode, int, boolean, java.lang.Object...)
      * 中赋值
+     * 当前资源名称对应的node
      */
     private ClusterNode clusterNode;
 

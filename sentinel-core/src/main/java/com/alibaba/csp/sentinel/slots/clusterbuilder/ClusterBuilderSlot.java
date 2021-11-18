@@ -19,6 +19,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import com.alibaba.csp.sentinel.Constants;
+import com.alibaba.csp.sentinel.CtSph;
 import com.alibaba.csp.sentinel.EntryType;
 import com.alibaba.csp.sentinel.context.Context;
 import com.alibaba.csp.sentinel.context.ContextUtil;
@@ -76,6 +77,8 @@ public class ClusterBuilderSlot extends AbstractLinkedProcessorSlot<DefaultNode>
 
     /**
      * 私有变量，局部的，当前资源对应的clusterNode
+     * 由于一个资源会共享一个ProcessorSlotChain，因此不同的线程访问一个资源时clusterNode是共享的。
+     * @see CtSph#lookProcessChain(com.alibaba.csp.sentinel.slotchain.ResourceWrapper)
      */
     private volatile ClusterNode clusterNode = null;
 

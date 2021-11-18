@@ -68,6 +68,7 @@ public abstract class Entry implements AutoCloseable {
     private long completeTimestamp;
 
     /**
+     * 当前上下文名称对应的node
      * @see NodeSelectorSlot#entry(com.alibaba.csp.sentinel.context.Context, com.alibaba.csp.sentinel.slotchain.ResourceWrapper, java.lang.Object, int, boolean, java.lang.Object...)
      * 处赋值
      */
